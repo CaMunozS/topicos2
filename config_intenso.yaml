@@ -1,0 +1,155 @@
+# =============================================================================
+#  SLM AUTÓNOMO · configuración
+#  No necesitas cambiar nada para partir: solo coloca tu clave en .env
+#  Los modelos de OpenAI y el presupuesto también se pueden ajustar en .env
+# =============================================================================
+
+run:
+  name: auto                 # auto = fecha y hora (p. ej. runs/20261005-101500)
+  output_dir: runs
+  seed: 42
+
+# ---------------------------------------------------------------- dominio
+domain:
+  description: >-
+    Asistente experto en inteligencia artificial generativa aplicada a empresas
+    en Chile y Latinoamérica: fundamentos de LLM, prompts, RAG, agentes,
+    ajuste fino, evaluación y operación responsable.
+  language: español neutro (Chile)
+  style: claro, preciso, con ejemplos concretos y viñetas cuando ayuden.
+  topics:                    # déjalo vacío ([]) para que el profesor proponga la taxonomía
+    - Fundamentos de LLM
+    - Ingeniería de prompts
+    - RAG y búsqueda semántica
+    - Agentes de IA y herramientas
+    - Ajuste fino y destilación
+    - Evaluación y LLMOps
+    - Gobierno, riesgos y regulación
+    - Casos de negocio y ROI
+
+# ---------------------------------------------------------- estudiante
+student:
+  # "Llama de 4B": Llama-3.1-Nemotron-Nano-4B-v1.1 (arquitectura Llama 3.1, 4,5 B parámetros,
+  # derivado por NVIDIA de Llama 3.1 8B mediante poda + destilación). Libre descarga.
+  # Alternativas: meta-llama/Llama-3.2-3B-Instruct (requiere HF_TOKEN y aceptar licencia),
+  #               meta-llama/Llama-3.2-1B-Instruct (notebooks modestos).
+  model_id: nvidia/Llama-3.1-Nemotron-Nano-4B-v1.1
+  system_prompt: auto        # auto = "detailed thinking off" para Nemotron; prompt en español para otros modelos
+  assistant_prefill: ""                     # opcional: "<think>\n</think>" fuerza respuesta directa
+  strip_think: true
+  dtype: auto                # auto | bfloat16 | float16 | float32
+  load_in_4bit: auto         # auto = QLoRA si GPU NVIDIA con < 20 GB; true/false para forzar
+  auto_4bit_below_vram_gb: 20
+  max_seq_len: 1024
+  max_new_tokens: 384
+  gen_batch_size: 8
+  repetition_penalty: 1.05
+  skip_memory_check: false   # true = no verificar memoria antes de cargar (Mac/CPU)
+
+# ---------------------------------------------------------------- LoRA
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+  modules_to_save: []
+
+# ---------------------------------------------------- entrenamiento
+training:
+  epochs_per_round: 2
+  batch_size: 2
+  grad_accum: 8              # lote efectivo = 16
+  learning_rate: 2.0e-4
+  warmup_ratio: 0.05
+  weight_decay: 0.0
+  max_grad_norm: 1.0
+  gradient_checkpointing: true
+  replay_ratio: 1.0          # por cada ejemplo nuevo, 1 de rondas anteriores (anti-olvido)
+  log_every: 5
+
+# --------------------------------------------------------- currículo
+curriculum:
+  tasks_per_round: 200
+  tasks_per_call: 10
+  difficulty_mix: {basica: 0.3, intermedia: 0.5, avanzada: 0.2}
+  weakness_gamma: 1.5        # >1 concentra más tareas en los temas débiles
+  min_topic_weight: 0.05     # ningún tema queda sin práctica
+  dedup_threshold: 0.85      # similitud de trigramas para descartar casi-duplicados
+  max_output_tokens: 3000
+  answer_max_output_tokens: 2000
+  max_answer_words: 220
+  min_answer_chars: 80
+  max_answer_chars: 2600
+
+# --------------------------------------------------------- evaluación
+evaluation:
+  eval_size: 40              # set fijo, separado, nunca se entrena con él
+  pass_threshold: 7          # nota ≥ 7 = aceptable
+  min_delta: 0.05            # mejora mínima para promover un checkpoint
+  rollback_tolerance: 0.30   # si cae más que esto vs. el mejor → revertir; si no → aceptar y seguir
+  judge_max_output_tokens: 1200
+  max_answer_chars_for_judge: 3000
+
+# ---------------------------------------------------------- autonomía
+autonomy:
+  max_rounds: 8
+  target_score: 8.5
+  patience: 3                # rondas seguidas sin mejora → parar
+  budget_usd: 20             # tope de gasto en la API (se puede cambiar con BUDGET_USD en .env)
+  max_hours: 24
+
+# ------------------------------------------------------------- OpenAI
+openai:
+  api_style: responses       # responses (recomendado) | chat
+  models:                    # se pueden sobrescribir en .env
+    curriculum: gpt-6-luna
+    teacher: gpt-6-sol
+    judge: gpt-6-sol
+  reasoning_effort: low      # none | low | medium | high … ("" para no enviarlo)
+  max_workers: 8             # llamadas en paralelo
+  max_retries: 5
+  timeout_s: 180
+  # USD por 1 millón de tokens. Verifica en https://openai.com/api/pricing antes de correr.
+  pricing:
+    gpt-6-sol:    {input: 2.00, cached_input: 0.20, output: 10.00}
+    gpt-6-luna:   {input: 0.10, cached_input: 0.01, output: 0.50}
+    gpt-5-mini:   {input: 0.25, cached_input: 0.025, output: 2.00}
+    gpt-4.1-mini: {input: 0.40, cached_input: 0.10, output: 1.60}
+    gpt-4o-mini:  {input: 0.15, cached_input: 0.075, output: 0.60}
+    default:      {input: 2.00, cached_input: 0.20, output: 10.00}
+
+monitoring:
+  tensorboard: true
+
+# --------------------------------------------- modo simulación (--simulate)
+# Prueba todo el pipeline sin clave, sin GPU y sin descargas: profesor/juez simulados
+# y un Llama diminuto creado localmente.
+simulation:
+  overrides:
+    domain:
+      topics: [Fundamentos de LLM, Ingeniería de prompts, RAG, Agentes de IA, Ajuste fino, Evaluación y LLMOps]
+    student:
+      model_id: tiny-random-llama
+      max_seq_len: 192
+      max_new_tokens: 72
+      gen_batch_size: 24
+      repetition_penalty: 1.1
+      tiny: {hidden_size: 256, intermediate_size: 688, layers: 4, heads: 4, kv_heads: 2}
+    lora:
+      modules_to_save: [embed_tokens, lm_head]
+    training:
+      epochs_per_round: 2
+      batch_size: 8
+      grad_accum: 1
+      learning_rate: 2.0e-3
+      gradient_checkpointing: false
+      log_every: 10
+    curriculum:
+      tasks_per_round: 90
+      dedup_threshold: 0.97
+      min_answer_chars: 20
+    evaluation:
+      eval_size: 24
+    autonomy:
+      max_rounds: 8
+      patience: 3

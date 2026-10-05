@@ -1,0 +1,19 @@
+# PyTorch se instala según el hardware antes de este archivo (los scripts setup_venv lo hacen).
+# En Google Colab ya viene con el runtime CUDA: no lo reinstales aquí para evitar reemplazar esa compilación.
+# Rangos probados juntos (oct-2026): transformers 4.56–5.18 · peft 0.17–0.21.
+transformers>=4.56,<5.19
+peft>=0.17,<0.22
+accelerate>=1.0
+safetensors>=0.4
+tokenizers>=0.21
+huggingface_hub>=0.34
+openai>=1.99,<4
+python-dotenv>=1.0
+pyyaml>=6.0
+matplotlib>=3.9
+rich>=13.0
+psutil>=5.9
+tensorboard>=2.16
+# QLoRA (4 bits) solo para GPU NVIDIA:
+bitsandbytes>=0.45; platform_system != "Darwin"
+pytest>=8.0
